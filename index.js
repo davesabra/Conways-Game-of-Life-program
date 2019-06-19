@@ -1,13 +1,16 @@
-import * as wasm from "wasm-game-of-life";
 
-//import { Universe } from "wasm-game-of-life";
+import * as wasm from "wgol2";
 
-import { Universe, Cell } from "wasm-game-of-life";
+
+
+import { Universe, Cell } from "wgol2";
+
 
 // Import the WebAssembly memory at the top of the file.
-import { memory } from "wasm-game-of-life/wasm_game_of_life_bg";
+//import { memory } from "wasm-game-of-life/wasm_game_of_life_bg";
+import { memory } from "wgol2/wgol2_bg";
 
-//wasm.greet("LALABEL");
+
 const CELL_SIZE = 5; // px
 const GRID_COLOR = "#CCCCCC";
 const DEAD_COLOR = "#FFFFFF";
@@ -61,18 +64,31 @@ const getIndex = (row, column) => {
   return row * width + column;
 };
 
+// given an index and Uint8Array you can determine whether the 
+// n'th bit is set with the following function
+const bitIsSet = (n, arr) => {
+  const byte = Math.floor(n / 8);
+  const mask = 1 << (n % 8);
+  return (arr[byte] & mask) === mask;
+};
+
+// given all that the new version of drawCells looks like this:
 const drawCells = () => {
   const cellsPtr = universe.cells();
-  //const cells = new Uint8Array(memory.buffer, cellsPtr, width * height);
-  const cells = new Uint8Array(memory.buffer, cellsPtr, width * height);
+  // const cells = new Uint8Array(memory.buffer, cellsPtr, width * height);  1 cell per byte
+  // This is updated!
+  const cells = new Uint8Array(memory.buffer, cellsPtr, width * height / 8);  // 1 cell per bit
+
 
   ctx.beginPath();
 
   for (let row = 0; row < height; row++) {
     for (let col = 0; col < width; col++) {
       const idx = getIndex(row, col);
-
-      ctx.fillStyle = cells[idx] === Cell.Dead
+      
+      // This is updated!
+      //ctx.fillStyle = cells[idx] === Cell.Dead
+      ctx.fillStyle = bitIsSet(idx, cells)
         ? DEAD_COLOR
         : ALIVE_COLOR;
 
@@ -92,5 +108,7 @@ const drawCells = () => {
 drawGrid();
 drawCells();
 requestAnimationFrame(renderLoop);
+
+
 
 

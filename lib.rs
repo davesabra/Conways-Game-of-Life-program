@@ -3,9 +3,11 @@ mod utils;
 extern crate js_sys;
 use wasm_bindgen::prelude::*;
 use std::fmt;
+extern crate fixedbitset; // to represent cells instead of Vec<Cell>
+use fixedbitset::FixedBitSet;
 
 #[wasm_bindgen]
-#[repr(u8)]                     //<-- each cell is represented by a single byte
+//#[repr(u8)]                     //<-- 1 byte per cell version
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Cell {
     Dead =  0,
@@ -17,7 +19,7 @@ pub enum Cell {
 pub struct Universe {
     width: u32,
     height: u32,
-    cells: Vec<Cell>,
+    cells: FixedBitSet, // type to represent cells instead of Vec<Cell>
 }
 
 impl Universe {
@@ -57,6 +59,14 @@ impl Universe {
                 let cell = self.cells[idx];
                 let live_neighbors = self.live_neighbor_count(row, col);
 
+                next.set(idx, match (cell, live_neighbors) {
+                   (true, x) if x < 2 => false,
+                   (true, 2) | (true, 3) => true,
+                   (true, x) if x > 3 => false,
+                   (false, 3) => true,
+                   (otherwise, _) => otherwise
+                });
+                /*
                 let next_cell = match (cell, live_neighbors) {
                     // Rule 1: Any live cell with fewer than two live neighbours
                     // dies, as if caused by underpopulation.
@@ -73,24 +83,27 @@ impl Universe {
                     // All other cells remain in the same state.
                     (otherwise, _) => otherwise,
                 };
-
-                next[idx] = next_cell;
+                */
+                //next[idx] = next_cell;
             }
         }
 
         self.cells = next;
     }
+    /*
     // THIS IS PERTINENT TO CELL PER BIT OPTIM
-    //pub fn cells(&self) -> *const u32 {
-    //    self.cells.as_slice().as_ptr()
-    //}
+    pub fn cells(&self) -> *const u32 {
+        self.cells.as_slice().as_ptr()
+    }
+    */
 }
 
 impl fmt::Display for Universe {                                             //<-- basic text render for human readable output
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for line in self.cells.as_slice().chunks(self.width as usize) {
             for &cell in line {
-                let symbol = if cell == Cell::Dead { '◻' } else { '◼' };
+                //let symbol = if cell == Cell::Dead { '◻' } else { '◼' };
+                let symbol = if cell == 0 { '◻' } else { '◼' };
                 write!(f, "{}", symbol)?;
             }
             write!(f, "\n")?;
@@ -111,15 +124,44 @@ impl Universe {
     pub fn height(&self) -> u32 {
         self.height
     }
-
+    
+    /* //not using Cell anymore
     pub fn cells(&self) -> *const Cell {
         self.cells.as_ptr()
+    }
+    */
+
+    pub fn cells(&self) -> *const u32 {
+        self.cells.as_slice().as_ptr()  // view the bitset as a slice of u32 blocks
+                                        // returning a raw ptr to the slice's buffer
     }
 
     pub fn new() -> Universe {
         let width = 64;
         let height = 64;
+        
+        let size = (width * height) as usize;
+        let mut cells = FixedBitSet::with_capacity(size);
+        
+        // modified init algorithm for the bit-optimised version
+        //for i in 0..size {
+        //cells.set(i, i % 2 == 0 || i % 7 == 0);
+        //}
 
+        //  possible random i.c's for bit-optimised version
+        for i in 0..size {
+        cells.set(i,
+            {let i = js_sys::Math::random();
+                if i < 0.7 {
+                   true                            //Cell::Alive
+                } else {
+                   false                            //Cell::Dead
+                } 
+            }    
+        )    
+        }
+        
+        /*
         let cells = (0..width * height)
             .map(|i| { 
                  let i = js_sys::Math::random();
@@ -131,6 +173,7 @@ impl Universe {
                 }
             })
             .collect();
+        */    
 
         Universe {
             width,
